@@ -1,11 +1,11 @@
 import json
 import string
-import math
-import numpy as np
+import random
 from collections import defaultdict
 from stop_words import get_stop_words
 from sklearn import linear_model
-from sklearn.preprocessing import normalize
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # Create list of punctuation and stop words
 punctuation = set(string.punctuation)
@@ -41,30 +41,19 @@ words = [x[1] for x in counts[:2000]]
 wordId = dict(zip(words, range(len(words))))
 wordSet = set(words)
 
-# Calculate idf for all words
-idf = defaultdict(int)
+# Transform the words into bag of words
+bag_of_words = []
 for review in reviews:
-    for word in set(review):
-        if word in wordSet:
-            idf[word] += 1
-for word in words:
-    idf[word] = math.log(N/idf[word])
-
-# Calculate tf-idf for all words
-tf_idfs = []
-for review in reviews:
-    tf_idf =[0] * len(words)
+    bow = [0] * len(words)
     for word in review:
         if word in wordSet:
-            tf_idf[wordId[word]] += idf[word]
-    tf_idf = normalize(np.array(tf_idf).reshape(1,-1), norm='l1') * 100
-    tf_idf = tf_idf.reshape(2000).tolist()
-    tf_idf.append(1)
-    tf_idfs.append(tf_idf)
+            bow[wordId[word]] += 1
+    bow.append(1)
+    bag_of_words.append(bow)
 
-X_train = tf_idfs[:90000]
+X_train = bag_of_words[:90000]
 Y_train = stars[:90000]
-X_valid = tf_idfs[90000:]
+X_valid = bag_of_words[90000:]
 Y_valid = stars[90000:]
 
 # Linear regression with regularizer
@@ -87,3 +76,32 @@ for z in zip(predictions, Y_valid):
     MSE += (z[0] - z[1]) **2
 MSE /= len(Y_valid)
 print("Validation MSE = %f"%(MSE))
+
+# Plot the word cloud for 50 most positive and most negative words
+thw = list(zip(words, theta))
+thw.sort(key=lambda x: x[1])
+print("10 most negative words:")
+for z in thw[:10]:
+    print(z)
+print("10 most positive words:")
+for z in thw[-10:]:
+    print(z)
+
+pos_words = dict(thw[-50:])
+neg_words = dict(map(lambda x: (x[0], -x[1]), thw[:50]))
+
+def red_func(word, font_size, position, orientation, random_state=None, **kwargs):
+    return "hsl(%d, 100%%, 50%%)" % random.randint(0, 40)
+
+def blue_func(word, font_size, position, orientation, random_state=None, **kwargs):
+    return "hsl(%d, 100%%, 50%%)" % random.randint(180, 220)
+
+posWC = WordCloud(background_color='white',width=1200,height=600).generate_from_frequencies(pos_words)
+plt.imshow(posWC.recolor(color_func=red_func,random_state=3))
+plt.axis("off")
+
+plt.figure()
+negWC = WordCloud(background_color='white',width=1200,height=600).generate_from_frequencies(neg_words)
+plt.imshow(negWC.recolor(color_func=blue_func,random_state=3))
+plt.axis("off")
+plt.show()
